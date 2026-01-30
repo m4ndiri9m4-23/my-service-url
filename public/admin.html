@@ -1,88 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            background: linear-gradient(135deg, #4338ca, #7e22ce, #db2777);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 2rem;
-        }
-    </style>
-</head>
-<body class="text-white">
-    <div class="glass p-10 w-full max-w-2xl shadow-2xl">
-        <h1 class="text-3xl font-bold mb-6 text-center">Admin Panel</h1>
-        
-        <div id="url-section" class="mb-8">
-            <input id="backend-url" type="text" placeholder="Enter Service URL" 
-                class="w-full p-4 rounded-xl bg-white/20 border border-white/30 outline-none mb-4">
-            <button onclick="saveUrl()" class="w-full bg-indigo-600 p-4 rounded-xl font-bold hover:bg-indigo-500 transition">SAVE SETTINGS</button>
-        </div>
-
-        <div id="admin-section" class="hidden">
-            <button onclick="addEmployee()" class="mb-4 bg-pink-500 px-6 py-2 rounded-lg font-bold shadow-lg">+ Add Employee</button>
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-white/20">
-                        <th class="p-3">Name</th>
-                        <th class="p-3">Status</th>
-                        <th class="p-3">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="employee-list"></tbody>
-            </table>
-        </div>
+<div class="mt-10 pt-8 border-t border-white/20">
+    <h2 class="text-xl font-bold mb-4">Create Employee Account</h2>
+    <div class="flex flex-col gap-3">
+        <input type="text" id="new-user" placeholder="New Username" class="p-3 rounded-lg bg-white/10 outline-none">
+        <input type="password" id="new-pass" placeholder="New Password" class="p-3 rounded-lg bg-white/10 outline-none">
+        <button onclick="createUser()" class="bg-pink-500 p-3 rounded-lg font-bold">CREATE ACCOUNT</button>
     </div>
+</div>
 
-    <script>
-        function saveUrl() {
-            const url = document.getElementById('backend-url').value;
-            localStorage.setItem('backend_url', url);
-            document.getElementById('url-section').classList.add('hidden');
-            document.getElementById('admin-section').classList.remove('hidden');
-            loadEmployees();
-        }
-
-        async function loadEmployees() {
-            const baseUrl = localStorage.getItem('backend_url');
-            const res = await fetch(`${baseUrl}/api/employees`);
-            const data = await res.json();
-            const list = document.getElementById('employee-list');
-            list.innerHTML = data.map(emp => `
-                <tr class="border-b border-white/10">
-                    <td class="p-3">${emp.name}</td>
-                    <td class="p-3"><span class="text-xs bg-white/20 px-2 py-1 rounded">${emp.status}</span></td>
-                    <td class="p-3">
-                        <button onclick="deleteEmp(${emp.id})" class="text-red-300 mr-2">Delete</button>
-                        <button onclick="suspendEmp(${emp.id})" class="text-yellow-300">Suspend</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        async function addEmployee() {
-            const name = prompt("Employee Name:");
-            if (!name) return;
-            const baseUrl = localStorage.getItem('backend_url');
-            await fetch(`${baseUrl}/api/employees`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ name })
-            });
-            loadEmployees();
-        }
-    </script>
-</body>
-</html>
+<script>
+async function createUser() {
+    const username = document.getElementById('new-user').value;
+    const password = document.getElementById('new-pass').value;
+    await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+    alert("User Created!");
+}
+</script>
