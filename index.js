@@ -1,42 +1,42 @@
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
+const mongoose = require('mongoose'); // Easier than MongoClient for apps
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-
 app.use(express.json());
-// This line tells Express to serve your HTML files from the "public" folder
 app.use(express.static('public'));
 
-// Mock Database (In-memory)
-let employees = [
-  { id: 1, name: "Admin User", status: "Active" }
-];
+// This part replaces your "run()" function and keeps the connection alive
+const uri = process.env.DATABASE_URL; 
 
-// 1. GET all employees
-app.get('/api/employees', (req, res) => {
+mongoose.connect(uri)
+  .then(() => console.log("Successfully connected to MongoDB!"))
+  .catch(err => console.error("Connection error:", err));
+
+// Create the "Employee" model for the database
+const Employee = mongoose.model('Employee', {
+  name: String,
+  status: { type: String, default: "Active" }
+});
+
+// GET all employees from MongoDB
+app.get('/api/employees', async (req, res) => {
+  const employees = await Employee.find();
   res.json(employees);
 });
 
-// 2. ADD employee
-app.post('/api/employees', (req, res) => {
-  const newEmployee = { id: Date.now(), name: req.body.name, status: "Active" };
-  employees.push(newEmployee);
-  res.status(201).json(newEmployee);
+// SAVE a new employee to MongoDB
+app.post('/api/employees', async (req, res) => {
+  const newEmp = new Employee({ name: req.body.name });
+  await newEmp.save();
+  res.json(newEmp);
 });
 
-// 3. SUSPEND employee
-app.patch('/api/employees/:id/suspend', (req, res) => {
-  const emp = employees.find(e => e.id === parseInt(req.params.id));
-  if (emp) emp.status = emp.status === "Suspended" ? "Active" : "Suspended";
-  res.json(emp);
+// DELETE an employee from MongoDB
+app.delete('/api/employees/:id', async (req, res) => {
+  await Employee.findByIdAndDelete(req.params.id);
+  res.json({ success: true });
 });
 
-// 4. DELETE employee
-app.delete('/api/employees/:id', (req, res) => {
-  employees = employees.filter(e => e.id !== parseInt(req.params.id));
-  res.send({ message: "Deleted successfully" });
-});
-
-app.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
