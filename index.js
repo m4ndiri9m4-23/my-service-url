@@ -2,7 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js'); // New Library
 const app = express();
+const path = require('path');
 
+app.use(express.static(path.join(--dirname, 'public')));
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -12,6 +14,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // LOGIN API using Supabase
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});    
     
     // Query the "users" table in Supabase
     const { data, error } = await supabase
