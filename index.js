@@ -1,24 +1,17 @@
 require('dotenv').config();
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js'); // New Library
+const { createClient } = require('@supabase/supabase-js');
 const app = express();
-const path = require('path');
 
-app.use(express.static(path.join(--dirname, 'public')));
 app.use(express.json());
 app.use(express.static('public'));
 
-// Connect to Supabase
+// Connect to Supabase using variables from Render Environment
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// LOGIN API using Supabase
+// LOGIN API: Checks the 'users' table in Supabase
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});    
-    
-    // Query the "users" table in Supabase
     const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -27,21 +20,28 @@ app.get('/', (req, res) => {
         .single();
 
     if (data) {
-        res.json({ success: true, message: "Login successful!" });
+        res.json({ success: true, message: "Login successful!", role: data.role });
     } else {
-        res.status(401).json({ success: false, message: "Invalid credentials" });
+        res.status(401).json({ success: false, message: "Invalid username or password" });
     }
 });
 
-// ADMIN API: Add employee to Supabase
-app.post('/api/employees', async (req, res) => {
-    const { name } = req.body;
+// ADMIN API: Get all employees
+app.get('/api/employees', async (req, res) => {
+    const { data } = await supabase.from('employees').select('*');
+    res.json(data || []);
+});
+
+// ADMIN API: Create a new user account (Employee access)
+app.post('/api/admin/create-user', async (req, res) => {
+    const { username, password } = req.body;
     const { data, error } = await supabase
-        .from('employees')
-        .insert([{ name, status: 'Active' }]);
+        .from('users')
+        .insert([{ username, password, role: 'employee' }]);
     
-    res.json(data);
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json({ message: "User created successfully!" });
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running with Supabase on ${PORT}`));
+app.listen(PORT, () => console.log(`Server live on ${PORT}`));
