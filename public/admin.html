@@ -1,0 +1,33 @@
+const list = document.getElementById('employee-list');
+
+async function loadEmployees() {
+    const baseUrl = localStorage.getItem('backend_url');
+    const response = await fetch(`${baseUrl}/api/employees`);
+    const data = await response.json();
+    
+    list.innerHTML = data.map(emp => `
+        <tr class="border-b border-white/10">
+            <td class="p-4 font-medium">${emp.name}</td>
+            <td class="p-4">
+                <span class="px-2 py-1 rounded text-xs ${emp.status === 'Active' ? 'bg-green-500' : 'bg-yellow-500'}">
+                    ${emp.status}
+                </span>
+            </td>
+            <td class="p-4 flex gap-3">
+                <button onclick="suspendEmp(${emp.id})" class="text-yellow-300 hover:scale-110 transition">Suspend</button>
+                <button onclick="deleteEmp(${emp.id})" class="text-red-400 hover:scale-110 transition">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function addEmployee() {
+    const name = prompt("Enter employee name:");
+    const baseUrl = localStorage.getItem('backend_url');
+    await fetch(`${baseUrl}/api/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    });
+    loadEmployees();
+}
