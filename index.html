@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purple ERP - Admin Monitoring</title>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --midnight: #2e1065; --indigo: #312e81; --powder: #fbcfe8; }
+        body { margin: 0; font-family: 'Poppins', sans-serif; color: white; background: radial-gradient(circle, var(--indigo), var(--midnight), #0f172a); height: 100vh; overflow: hidden; }
+        .hidden { display: none !important; }
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px; }
+        .card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 1.5rem; margin-bottom: 1rem; }
+        nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.2); z-index: 1000; }
+        .nav-item { text-align: center; font-size: 0.7rem; opacity: 0.6; cursor: pointer; }
+        .nav-item.active { opacity: 1; color: var(--powder); }
+        input, select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid var(--powder); background: rgba(0,0,0,0.3); color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; margin-top: 10px; border-radius: 12px; border: none; background: var(--powder); color: var(--midnight); font-weight: 600; cursor: pointer; }
+        video { width: 100%; border-radius: 15px; background: black; }
+        #admin-map { height: 250px; width: 100%; border-radius: 15px; margin-top: 10px; z-index: 1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.75rem; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { color: var(--powder); text-transform: uppercase; letter-spacing: 1px; }
+        .search-container { position: sticky; top: 0; background: var(--midnight); z-index: 10; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="url-screen" style="padding: 40px; text-align: center;">
+        <h2>ERP Gateway</h2>
+        <input type="text" id="service-url" placeholder="Paste Firebase Database URL here">
+        <button onclick="saveUrl()">Connect System</button>
+    </div>
+
+    <div id="login-screen" class="hidden" style="padding: 40px; text-align: center;">
+        <h2>Welcome Back</h2>
+        <input type="email" id="login-email" placeholder="Email">
+        <input type="password" id="login-pass" placeholder="Password">
+        <button onclick="handleLogin()">Login</button>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <main>
+            <div id="view-attendance">
+                <h2>Attendance</h2>
+                <div class="card">
+                    <video id="webcam" autoplay playsinline></video>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="doAttendance('Clock In')" style="background: #22c55e; color: white;">Clock In</button>
+                        <button onclick="doAttendance('Clock Out')" style="background: #ef4444; color: white;">Clock Out</button>
+                    </div>
+                </div>
+                <div id="attendance-list"></div>
+            </div>
+
+            <div id="view-admin" class="hidden">
+                <h2>Admin Monitoring</h2>
+                
+                <div class="card">
+                    <div id="admin-map"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Master Attendance Log</h3>
+                    <div class="search-container">
+                        <input type="text" id="admin-search" placeholder="Search by name, date, or type..." onkeyup="filterAttendance()">
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Staff Name</th>
+                                    <th>Type</th>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="master-attendance-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Register New Staff</h3>
+                    <input type="text" id="new-name" placeholder="Full Name">
+                    <input type="email" id="new-email" placeholder="Email">
+                    <input type="password" id="new-pass" placeholder="Password">
+                    <select id="new-role"><option value="user">User</option><option value="admin">Admin</option></select>
+                    <button onclick="createNewUser()">Register Employee</button>
+                </div>
+            </div>
+        </main>
+
+        <nav>
+            <div class="nav-item active" onclick="switchTab('view-attendance')"><i data-lucide="clock"></i><br>Time</div>
+            <div id="admin-nav" class="nav-item hidden" onclick="switchTab('view-admin')"><i data-lucide="shield-check"></i><br>Admin</div>
+            <div class="nav-item" onclick="location.reload()"><i data-lucide="log-out"></i><br>Exit</div>
+        </nav>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let currentUser = null;
+        let map = null;
+        let markers = {};
+        let allAttendanceData = [];
+
+        function saveUrl() {
+            const url = document.getElementById('service-url').value.trim();
+            if (url.startsWith('https://')) { localStorage.setItem('erp_url', url); initFirebase(url); }
+        }
+
+        function initFirebase(url) {
+            if (!firebase.apps.length) {
+                firebase.initializeApp({ 
+                    databaseURL: url, 
+                    apiKey: "AIzaSyAsDXdWjdBz9DjtfXe_IBU4ZWpVlDlDD3I",
+                    authDomain: url.split('//')[1].split('/')[0].replace('.firebasedatabase.app', '.firebaseapp.com')
+                });
+            }
+            document.getElementById('url-screen').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            try {
+                const res = await firebase.auth().signInWithEmailAndPassword(email, pass);
+                firebase.database().ref('users/' + res.user.uid).once('value', snap => {
+                    if (snap.exists()) startApp(snap.val(), res.user.uid);
+                });
+            } catch (e) { alert(e.message); }
+        }
+
+        function startApp(user, uid) {
+            currentUser = { ...user, uid };
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            if(user.role === 'admin') {
+                document.getElementById('admin-nav').classList.remove('hidden');
+                initMap();
+                loadMasterAttendance();
+            }
+            startCamera();
+            loadUserLogs();
+        }
+
+        function initMap() {
+            setTimeout(() => {
+                map = L.map('admin-map').setView([14.5995, 120.9842], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            }, 500);
+        }
+
+        function loadMasterAttendance() {
+            firebase.database().ref('attendance').on('value', snap => {
+                allAttendanceData = [];
+                const table = document.getElementById('master-attendance-table');
+                table.innerHTML = "";
+                snap.forEach(child => {
+                    const data = { ...child.val(), id: child.key };
+                    allAttendanceData.push(data);
+                    
+                    // Update Map Markers
+                    if(data.lat && data.lng && map) {
+                        if (markers[data.uid]) map.removeLayer(markers[data.uid]);
+                        markers[data.uid] = L.marker([data.lat, data.lng]).addTo(map)
+                            .bindPopup(`<b>${data.name}</b><br>${data.type}`);
+                    }
+                });
+                renderTable(allAttendanceData);
+            });
+        }
+
+        function renderTable(dataArray) {
+            const table = document.getElementById('master-attendance-table');
+            table.innerHTML = "";
+            dataArray.reverse().forEach(data => {
+                const row = `<tr>
+                    <td><b>${data.name}</b></td>
+                    <td><span style="color:${data.type==='Clock In'?'#22c55e':'#ef4444'}">${data.type}</span></td>
+                    <td>${new Date(data.time).toLocaleString()}</td>
+                    <td><button onclick="viewOnMap(${data.lat}, ${data.lng})" style="padding:5px; font-size:10px; width:auto; margin:0;">Map</button></td>
+                </tr>`;
+                table.innerHTML += row;
+            });
+        }
+
+        function filterAttendance() {
+            const term = document.getElementById('admin-search').value.toLowerCase();
+            const filtered = allAttendanceData.filter(item => 
+                item.name.toLowerCase().includes(term) || 
+                item.type.toLowerCase().includes(term) ||
+                new Date(item.time).toLocaleString().toLowerCase().includes(term)
+            );
+            renderTable(filtered);
+        }
+
+        function viewOnMap(lat, lng) {
+            if(map) {
+                map.setView([lat, lng], 16);
+                switchTab('view-admin'); // Ensure map tab is visible
+            }
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                document.getElementById('webcam').srcObject = stream;
+            } catch (e) { console.log("Camera access denied"); }
+        }
+
+        function doAttendance(type) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const log = {
+                    name: currentUser.name, uid: currentUser.uid, type: type,
+                    lat: pos.coords.latitude, lng: pos.coords.longitude, time: Date.now()
+                };
+                firebase.database().ref('attendance').push(log);
+                alert(type + " Successful!");
+            }, () => alert("Please enable GPS."));
+        }
+
+        function loadUserLogs() {
+            firebase.database().ref('attendance').orderByChild('uid').equalTo(currentUser.uid).on('value', snap => {
+                const div = document.getElementById('attendance-list');
+                div.innerHTML = "<h3>Your History</h3>";
+                snap.forEach(child => {
+                    const l = child.val();
+                    div.innerHTML += `<div class="card" style="padding:10px; font-size:0.7rem;">${new Date(l.time).toLocaleString()} - <b>${l.type}</b></div>`;
+                });
+            });
+        }
+
+        function switchTab(id) {
+            document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(n => n.getAttribute('onclick').includes(id));
+            if(activeNav) activeNav.classList.add('active');
+            if(id === 'view-admin' && map) { setTimeout(() => map.invalidateSize(), 200); }
+        }
+
+        async function createNewUser() {
+            const email = document.getElementById('new-email').value;
+            const pass = document.getElementById('new-pass').value;
+            const name = document.getElementById('new-name').value;
+            const role = document.getElementById('new-role').value;
+            try {
+                const res = await firebase.auth().createUserWithEmailAndPassword(email, pass);
+                await firebase.database().ref('users/' + res.user.uid).set({ name, email, role });
+                alert("New Staff Registered!");
+            } catch (e) { alert(e.message); }
+        }
+
+        window.onload = () => {
+            const saved = localStorage.getItem('erp_url');
+            if(saved) document.getElementById('service-url').value = saved;
+        };
+    </script>
+</body>
+</html>
